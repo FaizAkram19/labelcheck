@@ -44,10 +44,25 @@ button{font:inherit;cursor:pointer}
 .slot .meta strong{display:block;font-size:14.5px}
 .slot .meta span{display:block;color:var(--ink-2);font-size:13px;margin-top:2px}
 .slot input[type=file]{display:none}
+.slot .actions{flex:none;display:flex;flex-direction:column;gap:6px}
 .slot label{
-  flex:none;padding:9px 14px;border:1.5px solid var(--indigo);border-radius:3px;
-  color:var(--indigo);font-weight:600;font-size:14px;cursor:pointer;
+  display:block;text-align:center;padding:8px 12px;border:1.5px solid var(--indigo);
+  border-radius:3px;color:var(--indigo);font-weight:600;font-size:13.5px;cursor:pointer;
+  white-space:nowrap;
 }
+.slot label.alt{border-color:var(--line);color:var(--ink-2);font-weight:500}
+.bulk{border:1px solid var(--line);border-radius:4px;background:#fff;padding:14px 16px;margin-top:14px}
+.bulk h3{margin:0 0 4px;font-size:14.5px}
+.bulk p{margin:0 0 12px;color:var(--ink-2);font-size:13.5px;line-height:1.45}
+.bulk input[type=file]{display:none}
+.bulk label{
+  display:block;text-align:center;padding:11px;border:1.5px solid var(--indigo);
+  border-radius:3px;color:var(--indigo);font-weight:600;font-size:14.5px;cursor:pointer;
+}
+.queue{margin-top:12px;font-size:13.5px}
+.queue div{padding:6px 0;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:10px}
+.queue .st{flex:none;font-weight:600}
+.q-wait{color:var(--ink-2)}.q-run{color:var(--indigo)}.q-ok{color:var(--green)}.q-err{color:var(--stamp)}
 details{border-top:1px solid var(--line);padding-top:12px;margin-top:8px}
 summary{cursor:pointer;color:var(--ink-2);font-size:14px}
 .flags{margin-top:12px;display:grid;gap:10px}
@@ -121,8 +136,12 @@ footer{margin-top:34px;padding-top:14px;border-top:1px solid var(--line);color:v
       <strong>Declaration panel</strong>
       <span id="cap-dec">The side with the fine print. Required.</span>
     </div>
-    <label for="file-dec" id="lbl-dec">Take photo</label>
-    <input type="file" id="file-dec" accept="image/*" capture="environment">
+    <div class="actions">
+      <label for="cam-dec" id="lbl-dec">Take photo</label>
+      <label for="file-dec" class="alt">Upload</label>
+    </div>
+    <input type="file" id="cam-dec" accept="image/*" capture="environment">
+    <input type="file" id="file-dec" accept="image/*">
   </div>
 
   <div class="slot" id="slot-front">
@@ -131,8 +150,12 @@ footer{margin-top:34px;padding-top:14px;border-top:1px solid var(--line);color:v
       <strong>Front panel</strong>
       <span id="cap-front">Add it if the price or quantity is on the front.</span>
     </div>
-    <label for="file-front" id="lbl-front">Add</label>
-    <input type="file" id="file-front" accept="image/*" capture="environment">
+    <div class="actions">
+      <label for="cam-front" id="lbl-front">Take photo</label>
+      <label for="file-front" class="alt">Upload</label>
+    </div>
+    <input type="file" id="cam-front" accept="image/*" capture="environment">
+    <input type="file" id="file-front" accept="image/*">
   </div>
 
   <details>
@@ -151,6 +174,15 @@ footer{margin-top:34px;padding-top:14px;border-top:1px solid var(--line);color:v
   area, and keep the flash off the glossy surface.</p>
 
   <button class="btn" id="go" disabled>Check compliance</button>
+
+  <div class="bulk">
+    <h3>Check several labels at once</h3>
+    <p>Pick multiple photos and each is checked as its own product, one after another.
+    Useful for working through a batch of label photos someone has sent you.</p>
+    <label for="file-bulk">Choose photos</label>
+    <input type="file" id="file-bulk" accept="image/*" multiple>
+    <div class="queue" id="queue"></div>
+  </div>
 </section>
 
 <!-- WORKING ------------------------------------------------------------ -->
@@ -180,20 +212,60 @@ footer{margin-top:34px;padding-top:14px;border-top:1px solid var(--line);color:v
 const $ = s => document.querySelector(s);
 const files = {DECLARATION:null, FRONT:null};
 
-function bindSlot(kind, inputId, thumbId, slotId, lblId, capId, capText){
-  $(inputId).addEventListener('change', e => {
+function bindSlot(kind, inputIds, thumbId, slotId, lblId, capId){
+  inputIds.forEach(inputId => $(inputId).addEventListener('change', e => {
     const f = e.target.files[0];
     if(!f) return;
     files[kind] = f;
     $(thumbId).src = URL.createObjectURL(f);
     $(slotId).classList.add('filled');
     $(lblId).textContent = 'Retake';
-    $(capId).textContent = capText;
+    $(capId).textContent = f.name.length > 28 ? f.name.slice(0,28) + '\u2026' : f.name;
     $('#go').disabled = !files.DECLARATION;
-  });
+  }));
 }
-bindSlot('DECLARATION','#file-dec','#thumb-dec','#slot-dec','#lbl-dec','#cap-dec','Ready.');
-bindSlot('FRONT','#file-front','#thumb-front','#slot-front','#lbl-front','#cap-front','Ready.');
+bindSlot('DECLARATION',['#cam-dec','#file-dec'],'#thumb-dec','#slot-dec','#lbl-dec','#cap-dec');
+bindSlot('FRONT',['#cam-front','#file-front'],'#thumb-front','#slot-front','#lbl-front','#cap-front');
+
+// --- bulk ----------------------------------------------------------------
+// Strictly one at a time. Firing them in parallel would hit the free-tier rate
+// limit immediately and most of the batch would come back as 429s.
+$('#file-bulk').addEventListener('change', async e => {
+  const picked = Array.from(e.target.files);
+  if(!picked.length) return;
+  e.target.value = '';
+
+  const rows = picked.map((f,i) => {
+    const id = 'q' + Date.now() + i;
+    return {id, file:f, name: f.name.length > 30 ? f.name.slice(0,30)+'\u2026' : f.name};
+  });
+  $('#queue').innerHTML = rows.map(r =>
+    `<div id="${r.id}"><span>${esc(r.name)}</span><span class="st q-wait">waiting</span></div>`
+  ).join('');
+
+  const setState = (id, cls, text) => {
+    const el = document.querySelector('#' + id + ' .st');
+    if(el){ el.className = 'st ' + cls; el.textContent = text; }
+  };
+
+  for(const r of rows){
+    setState(r.id, 'q-run', 'checking\u2026');
+    const fd = new FormData();
+    fd.append('images', r.file);
+    fd.append('panels', 'DECLARATION');
+    try{
+      const resp = await fetch('/api/scans/create/', {method:'POST', body:fd});
+      const data = await resp.json();
+      if(!resp.ok){ setState(r.id, 'q-err', 'failed'); continue; }
+      const label = {COMPLIANT:'compliant', NON_COMPLIANT:'not compliant',
+                     EXEMPT:'exempt'}[data.verdict] || 'done';
+      setState(r.id, data.verdict === 'COMPLIANT' ? 'q-ok' : 'q-err', label);
+    }catch(err){
+      setState(r.id, 'q-err', 'failed');
+    }
+    loadHistory();
+  }
+});
 
 const show = id => {
   ['#capture','#working','#report'].forEach(s => $(s).classList.add('hide'));
@@ -292,10 +364,10 @@ function renderReport(d){
 
 function reset(){
   files.DECLARATION = files.FRONT = null;
-  ['#file-dec','#file-front'].forEach(s => $(s).value = '');
+  ['#cam-dec','#file-dec','#cam-front','#file-front'].forEach(s => $(s).value = '');
   ['#slot-dec','#slot-front'].forEach(s => $(s).classList.remove('filled'));
   $('#thumb-dec').removeAttribute('src'); $('#thumb-front').removeAttribute('src');
-  $('#lbl-dec').textContent = 'Take photo'; $('#lbl-front').textContent = 'Add';
+  $('#lbl-dec').textContent = 'Take photo'; $('#lbl-front').textContent = 'Take photo';
   $('#cap-dec').textContent = 'The side with the fine print. Required.';
   $('#cap-front').textContent = 'Add it if the price or quantity is on the front.';
   $('#go').disabled = true;
