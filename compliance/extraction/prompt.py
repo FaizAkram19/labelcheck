@@ -43,20 +43,40 @@ USER_TEMPLATE = """Transcribe the label in the image(s) into this exact JSON sha
   "fields": {{
 {field_lines}
   }},
-  "confidence": {{
-{confidence_lines}
-  }},
-  "notes": "any part of the label that was unreadable, blurred or cut off"
+  "unclear": [],
+  "notes": ""
 }}
 
 Each value in "fields" is the text exactly as printed, or "" if absent.
-Each value in "confidence" is one of "high", "medium", "low" - how clearly you
-could read that field. Use "low" for anything you are unsure of rather than
-omitting it.
+
+"unclear" is a list of field names you could not read confidently - leave it
+empty if everything was legible. Do not list fields that are simply absent from
+the label; absent is not the same as unreadable.
+
+"notes" is at most one short sentence about anything blurred or cut off, or ""
+if there is nothing to say. Keep it brief.
+
+Answer with JSON only. Do not think out loud before answering.
 """
+
+
+# The API validates the model's output against this, so a truncated or
+# malformed object is rejected by Google rather than reaching us as broken text.
+RESPONSE_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {
+        "fields": {
+            "type": "OBJECT",
+            "properties": {f: {"type": "STRING"} for f in FIELDS},
+            "required": FIELDS,
+        },
+        "unclear": {"type": "ARRAY", "items": {"type": "STRING"}},
+        "notes": {"type": "STRING"},
+    },
+    "required": ["fields"],
+}
 
 
 def build_user_prompt():
     field_lines = ",\n".join(f'    "{f}": ""' for f in FIELDS)
-    conf_lines = ",\n".join(f'    "{f}": "high|medium|low"' for f in FIELDS)
-    return USER_TEMPLATE.format(field_lines=field_lines, confidence_lines=conf_lines)
+    return USER_TEMPLATE.format(field_lines=field_lines)

@@ -281,7 +281,10 @@ function renderReport(d){
     <p class="scanned">${esc(d.product_label || 'Unnamed product')} · check #${d.id}</p>
     ${vs.map(findingBlock).join('')}
     ${fieldsTable(d.fields_read)}
-    ${d.notes ? `<p class="hint" style="margin-top:14px">Reader note: ${esc(d.notes)}</p>` : ''}
+    ${(d.unclear && d.unclear.length) ? `<p class="hint" style="margin-top:14px">
+      Read with low confidence: ${d.unclear.map(f => esc(f.replace(/_/g,' '))).join(', ')}.
+      Retake the photo if a finding above looks wrong.</p>` : ''}
+    ${d.notes ? `<p class="hint" style="margin-top:8px">Reader note: ${esc(d.notes)}</p>` : ''}
     <button class="btn secondary" style="margin-top:22px" onclick="reset()">Check another package</button>`;
   $('#history-wrap').classList.remove('hide');
   window.scrollTo(0,0);

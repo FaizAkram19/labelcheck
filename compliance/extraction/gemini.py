@@ -15,11 +15,12 @@ import time
 
 import requests
 
-from .prompt import SYSTEM, build_user_prompt, FIELDS
+from .prompt import SYSTEM, RESPONSE_SCHEMA, build_user_prompt, FIELDS
 
 API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models"
 DEFAULT_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
-TIMEOUT = int(os.environ.get("GEMINI_TIMEOUT", "60"))
+TIMEOUT = int(os.environ.get("GEMINI_TIMEOUT", "90"))
+MAX_TOKENS = int(os.environ.get("GEMINI_MAX_TOKENS", "8192"))
 RETRIES = int(os.environ.get("GEMINI_RETRIES", "3"))
 
 # Transient on Google's side, not ours: 503 is an overloaded model, 500 and 504
@@ -30,6 +31,21 @@ RETRYABLE = {429, 500, 502, 503, 504}
 
 class ExtractionError(RuntimeError):
     pass
+
+
+# generationConfig keys that are nice to have but not essential. If a model
+# rejects one, we drop it and keep going rather than failing the scan.
+OPTIONAL_CONFIG_KEYS = ("thinkingConfig", "responseSchema")
+
+
+def _drop_unsupported(config, error_text):
+    """Remove whichever optional key the API complained about. True if we removed one."""
+    lowered = (error_text or "").lower()
+    for key in OPTIONAL_CONFIG_KEYS:
+        if key in config and key.lower() in lowered:
+            config.pop(key)
+            return True
+    return False
 
 
 def _backoff(attempt):
@@ -117,14 +133,21 @@ def extract(image_blobs, model=None, api_key=None):
             }
         })
 
+    generation_config = {
+        "temperature": 0,                   # transcription, not creativity
+        "responseMimeType": "application/json",
+        "responseSchema": RESPONSE_SCHEMA,
+        # Generous, because thinking tokens are drawn from this same budget.
+        # Running out mid-object is what produces truncated JSON.
+        "maxOutputTokens": MAX_TOKENS,
+        # Nothing here needs deliberation - it is transcription. Turning
+        # thinking off leaves the whole budget for the answer and is faster.
+        "thinkingConfig": {"thinkingBudget": 0},
+    }
     payload = {
         "systemInstruction": {"parts": [{"text": SYSTEM}]},
         "contents": [{"role": "user", "parts": parts}],
-        "generationConfig": {
-            "temperature": 0,               # transcription, not creativity
-            "responseMimeType": "application/json",
-            "maxOutputTokens": 2048,
-        },
+        "generationConfig": generation_config,
     }
 
     model = model or DEFAULT_MODEL
@@ -141,6 +164,16 @@ def extract(image_blobs, model=None, api_key=None):
                     f"Could not reach the extraction API: {exc}") from exc
             time.sleep(_backoff(attempt))
             continue
+
+        # Not every model accepts every generationConfig key. Rather than
+        # pinning a model list that goes stale, drop the optional keys the API
+        # objects to and try again.
+        if resp.status_code == 400:
+            dropped = _drop_unsupported(generation_config, resp.text)
+            if dropped:
+                payload["generationConfig"] = generation_config
+                continue
+            break
 
         if resp.status_code not in RETRYABLE or attempt == RETRIES - 1:
             break
@@ -173,18 +206,38 @@ def extract(image_blobs, model=None, api_key=None):
         raise ExtractionError(f"Extraction API returned {resp.status_code}: {resp.text[:300]}")
 
     body = resp.json()
+    candidate = (body.get("candidates") or [{}])[0]
+    finish = candidate.get("finishReason", "")
+
+    if finish == "MAX_TOKENS":
+        raise ExtractionError(
+            "The model ran out of output space before finishing the label. Raise "
+            f"GEMINI_MAX_TOKENS in .env above the current {MAX_TOKENS}."
+        )
+    if finish in ("SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST"):
+        raise ExtractionError(
+            f"The image was blocked by a content filter ({finish}). Retake the photo showing "
+            "only the label."
+        )
+
     try:
-        text = body["candidates"][0]["content"]["parts"][0]["text"]
+        text = candidate["content"]["parts"][0]["text"]
     except (KeyError, IndexError) as exc:
-        raise ExtractionError(f"Unexpected response shape: {json.dumps(body)[:300]}") from exc
+        raise ExtractionError(
+            f"Unexpected response shape (finishReason={finish or 'none'}): "
+            f"{json.dumps(body)[:300]}"
+        ) from exc
 
     try:
         data = json.loads(_strip_fences(text))
     except json.JSONDecodeError as exc:
-        raise ExtractionError(f"Model did not return valid JSON: {text[:300]}") from exc
+        raise ExtractionError(
+            "The model's reply was not valid JSON. It usually means the reply was cut off "
+            f"(finishReason={finish or 'none'}). First part of it: {text[:200]}"
+        ) from exc
 
     data.setdefault("fields", {})
-    data.setdefault("confidence", {})
+    data.setdefault("unclear", [])
     data["_model"] = model
     return data
 

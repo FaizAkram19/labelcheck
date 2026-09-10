@@ -50,14 +50,14 @@ class ScanDetailSerializer(serializers.ModelSerializer):
     images = ScanImageSerializer(many=True, read_only=True)
     counts = serializers.ReadOnlyField()
     fields_read = serializers.SerializerMethodField()
-    confidence = serializers.SerializerMethodField()
+    unclear = serializers.SerializerMethodField()
     notes = serializers.SerializerMethodField()
 
     class Meta:
         model = Scan
         fields = ["id", "created_at", "product_label", "status", "verdict",
                   "is_imported", "exempt_reason", "error", "is_demo", "counts",
-                  "fields_read", "confidence", "notes", "images", "violations"]
+                  "fields_read", "unclear", "notes", "images", "violations"]
 
     def _raw(self, obj):
         extracted = getattr(obj, "extracted", None)
@@ -67,8 +67,8 @@ class ScanDetailSerializer(serializers.ModelSerializer):
         extracted = getattr(obj, "extracted", None)
         return extracted.merged_fields if extracted else {}
 
-    def get_confidence(self, obj):
-        return self._raw(obj).get("confidence", {})
+    def get_unclear(self, obj):
+        return self._raw(obj).get("unclear", [])
 
     def get_notes(self, obj):
         return self._raw(obj).get("notes", "")
