@@ -81,7 +81,7 @@ def evaluate(fields, rules, pack_sizes, is_imported=False, manual_flags=None):
         "pack_size_entry": match_pack_size(fields, quantity, pack_sizes),
     }
 
-    results, failed = [], False
+    results, failed, incomplete = [], False, False
     for rule in rules:
         fn = REGISTRY.get(rule.code)
         if fn is None:
@@ -92,6 +92,8 @@ def evaluate(fields, rules, pack_sizes, is_imported=False, manual_flags=None):
             status, observed, message = "SKIP", "", f"Check could not be run: {exc}"
         if status == "FAIL":
             failed = True
+        elif status == "RECHECK":
+            incomplete = True
         results.append({
             "rule": rule,
             "status": status,
@@ -100,4 +102,14 @@ def evaluate(fields, rules, pack_sizes, is_imported=False, manual_flags=None):
             "message": message,
         })
 
-    return ("NON_COMPLIANT" if failed else "COMPLIANT"), "", results
+    # A violation outranks an incomplete check: finding a real breach does not
+    # become less true because some other declaration sits on an unseen panel.
+    # But we never call a label compliant while a mandatory declaration has gone
+    # unread - that is how a scanner ends up confidently wrong.
+    if failed:
+        verdict = "NON_COMPLIANT"
+    elif incomplete:
+        verdict = "INCOMPLETE"
+    else:
+        verdict = "COMPLIANT"
+    return verdict, "", results

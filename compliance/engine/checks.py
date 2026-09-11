@@ -20,12 +20,20 @@ def check(code):
 
 
 PASS, FAIL, SKIP, INFO = "PASS", "FAIL", "SKIP", "INFO"
+# The declaration exists but is printed on a part of the package we were not
+# shown. Not a violation, not a pass - an incomplete check.
+RECHECK = "RECHECK"
+
+ELSEWHERE_MSG = ("The label points to another part of the package for this declaration, so it "
+                 "has not been checked. Photograph that panel and scan again.")
 
 
-def _presence(fields, key, label, citation_hint=""):
+def _presence(fields, key, label):
     value = fields.get(key)
     if nz.is_blank(value):
         return FAIL, "", f"{label} not found on any panel supplied."
+    if nz.points_elsewhere(value):
+        return RECHECK, nz.clean(value)[:280], ELSEWHERE_MSG
     return PASS, nz.clean(value)[:280], f"{label} declared."
 
 
@@ -45,6 +53,8 @@ def manufacturer(fields, ctx):
                                             "the name and the complete address.")
     if nz.is_blank(name):
         return FAIL, nz.clean(addr)[:280], "An address is present but no name."
+    if nz.points_elsewhere(name) or nz.points_elsewhere(addr):
+        return RECHECK, f"{nz.clean(name)} - {nz.clean(addr)}"[:280], ELSEWHERE_MSG
     return PASS, f"{nz.clean(name)} - {nz.clean(addr)}"[:280], "Name and address declared."
 
 
@@ -64,8 +74,11 @@ def common_name(fields, ctx):
 def net_quantity_present(fields, ctx):
     if ctx.get("quantity"):
         return PASS, ctx["quantity"]["text"][:280], "Net quantity declared."
-    if not nz.is_blank(fields.get("net_quantity")):
-        return FAIL, nz.clean(fields["net_quantity"])[:280], (
+    raw = fields.get("net_quantity")
+    if nz.points_elsewhere(raw):
+        return RECHECK, nz.clean(raw)[:280], ELSEWHERE_MSG
+    if not nz.is_blank(raw):
+        return FAIL, nz.clean(raw)[:280], (
             "Text was found in the net quantity area but no readable quantity and unit could be "
             "parsed from it.")
     return FAIL, "", "Net quantity not found on any panel supplied."
@@ -76,6 +89,8 @@ def manufacture_date(fields, ctx):
     value = fields.get("manufacture_date")
     if nz.is_blank(value):
         return FAIL, "", "Month and year of manufacture, packing or import not found."
+    if nz.points_elsewhere(value):
+        return RECHECK, nz.clean(value)[:280], ELSEWHERE_MSG
     parsed = nz.parse_month_year(value)
     if not parsed["found"]:
         return FAIL, parsed["text"][:280], (
@@ -87,9 +102,12 @@ def manufacture_date(fields, ctx):
 
 @check("R06")
 def mrp_present(fields, ctx):
+    raw = fields.get("mrp", "")
+    if nz.points_elsewhere(raw):
+        return RECHECK, nz.clean(raw)[:280], ELSEWHERE_MSG
     mrp = ctx.get("mrp")
     if mrp is None or mrp["amount"] is None:
-        return FAIL, nz.clean(fields.get("mrp", ""))[:280], "Retail sale price not found."
+        return FAIL, nz.clean(raw)[:280], "Retail sale price not found."
     return PASS, mrp["text"][:280], "Retail sale price declared."
 
 
@@ -99,6 +117,8 @@ def consumer_care(fields, ctx):
     if nz.is_blank(value):
         return FAIL, "", ("No consumer care contact found - the rule requires a name, address, "
                           "telephone number and e-mail address where available.")
+    if nz.points_elsewhere(value):
+        return RECHECK, nz.clean(value)[:280], ELSEWHERE_MSG
     if not nz.has_contact_channel(value):
         return FAIL, nz.clean(value)[:280], (
             "A consumer care line was found but it contains no usable contact channel - no "
@@ -112,6 +132,8 @@ def consumer_care(fields, ctx):
 
 @check("R08")
 def mrp_format(fields, ctx):
+    if nz.points_elsewhere(fields.get("mrp", "")):
+        return SKIP, "", "The price is declared on another panel, so its wording was not checked."
     mrp = ctx.get("mrp")
     if mrp is None or mrp["amount"] is None:
         return SKIP, "", "No retail sale price to check the wording of."

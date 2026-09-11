@@ -228,3 +228,51 @@ class EngineTests(TestCase):
     def test_every_active_rule_produces_a_result(self):
         _, _, results = self.run_engine(good_biscuit())
         self.assertEqual(len(results), len(self.rules))
+
+
+class CrossReferenceTests(EngineTests):
+    """A declaration printed elsewhere on the pack is not a missing declaration."""
+
+    def test_price_pointing_to_the_bottom_is_not_a_violation(self):
+        f = good_biscuit()
+        f["mrp"] = "See bottom for MRP Rs. (incl. of all taxes)"
+        verdict, _, results = self.run_engine(f)
+        st = self.statuses(results)
+        self.assertEqual(st["R06"], "RECHECK")
+        self.assertEqual(st["R08"], "SKIP")
+        self.assertEqual(verdict, "INCOMPLETE")
+
+    def test_net_quantity_pointing_to_coding_area(self):
+        f = good_biscuit()
+        f["net_quantity"] = "NET WT. (WHEN PACKED) : SEE CODING AREA."
+        verdict, _, results = self.run_engine(f)
+        self.assertEqual(self.statuses(results)["R04"], "RECHECK")
+        self.assertEqual(verdict, "INCOMPLETE")
+
+    def test_packing_date_pointing_to_the_bottom(self):
+        f = good_biscuit()
+        f["manufacture_date"] = "See bottom for PKD."
+        _, _, results = self.run_engine(f)
+        self.assertEqual(self.statuses(results)["R05"], "RECHECK")
+
+    def test_a_real_violation_still_outranks_an_incomplete_check(self):
+        f = good_biscuit()
+        f["mrp"] = "See bottom for MRP"
+        f["consumer_care"] = ""
+        verdict, _, results = self.run_engine(f)
+        st = self.statuses(results)
+        self.assertEqual(st["R06"], "RECHECK")
+        self.assertEqual(st["R07"], "FAIL")
+        self.assertEqual(verdict, "NON_COMPLIANT")
+
+    def test_genuinely_missing_price_is_still_a_violation(self):
+        f = good_biscuit()
+        f["mrp"] = ""
+        verdict, _, results = self.run_engine(f)
+        self.assertEqual(self.statuses(results)["R06"], "FAIL")
+        self.assertEqual(verdict, "NON_COMPLIANT")
+
+    def test_normal_labels_are_unaffected(self):
+        verdict, _, results = self.run_engine(good_biscuit())
+        self.assertEqual(verdict, "COMPLIANT")
+        self.assertNotIn("RECHECK", self.statuses(results).values())

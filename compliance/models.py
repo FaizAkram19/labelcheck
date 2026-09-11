@@ -81,6 +81,7 @@ class Scan(models.Model):
     VERDICT = [
         ("COMPLIANT", "Compliant"),
         ("NON_COMPLIANT", "Non-compliant"),
+        ("INCOMPLETE", "Incomplete - a declaration sits on an unseen panel"),
         ("EXEMPT", "Out of scope"),
         ("UNKNOWN", "Unknown"),
     ]
@@ -109,6 +110,7 @@ class Scan(models.Model):
         return {
             "major": sum(1 for x in v if x.severity == "MAJOR" and x.status == "FAIL"),
             "minor": sum(1 for x in v if x.severity == "MINOR" and x.status == "FAIL"),
+            "recheck": sum(1 for x in v if x.status == "RECHECK"),
             "passed": sum(1 for x in v if x.status == "PASS"),
         }
 
@@ -144,11 +146,12 @@ class ExtractedData(models.Model):
 class Violation(models.Model):
     """One rule's result against one scan. Stored for passes too, so the report is complete."""
 
-    STATUS = [("PASS", "Pass"), ("FAIL", "Fail"), ("SKIP", "Not applicable"), ("INFO", "Info")]
+    STATUS = [("PASS", "Pass"), ("FAIL", "Fail"), ("SKIP", "Not applicable"),
+              ("RECHECK", "Declared on another panel - not checked"), ("INFO", "Info")]
 
     scan = models.ForeignKey(Scan, related_name="violations", on_delete=models.CASCADE)
     rule = models.ForeignKey(Rule, on_delete=models.PROTECT)
-    status = models.CharField(max_length=6, choices=STATUS)
+    status = models.CharField(max_length=8, choices=STATUS)
     severity = models.CharField(max_length=8)
     observed = models.CharField(max_length=300, blank=True)
     message = models.TextField(blank=True)

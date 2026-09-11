@@ -77,6 +77,7 @@ summary{cursor:pointer;color:var(--ink-2);font-size:14px}
 .v-fail{border-color:var(--stamp);background:#FCF3F2;color:var(--stamp)}
 .v-pass{border-color:var(--green);background:#F1F7F3;color:var(--green)}
 .v-exempt{border-color:var(--indigo);background:var(--tint);color:var(--indigo)}
+.v-part{border-color:var(--ochre);background:#FCF7EC;color:var(--ochre)}
 .verdict p{color:var(--ink)}
 .scanned{color:var(--ink-2);font-size:13px;margin:0 0 20px}
 
@@ -84,7 +85,8 @@ summary{cursor:pointer;color:var(--ink-2);font-size:14px}
 .finding{border-top:1px solid var(--line);padding:14px 0 14px 34px;position:relative}
 .finding:last-child{border-bottom:1px solid var(--line)}
 .mark{position:absolute;left:0;top:15px;width:22px;text-align:center;font-weight:700;font-size:15px}
-.m-fail{color:var(--stamp)}.m-pass{color:var(--green)}.m-skip{color:var(--ink-2)}.m-info{color:var(--indigo)}
+.m-fail{color:var(--stamp)}.m-pass{color:var(--green)}.m-skip{color:var(--ink-2)}
+.m-info{color:var(--indigo)}.m-recheck{color:var(--ochre)}
 .finding .top{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
 .finding .name{font-weight:600;font-size:15px}
 .cite{
@@ -305,7 +307,8 @@ function renderError(data){
   $('#history-wrap').classList.remove('hide');
 }
 
-const MARK = {PASS:['m-pass','✓'], FAIL:['m-fail','✕'], SKIP:['m-skip','–'], INFO:['m-info','i']};
+const MARK = {PASS:['m-pass','✓'], FAIL:['m-fail','✕'], SKIP:['m-skip','–'],
+              RECHECK:['m-recheck','?'], INFO:['m-info','i']};
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 function verdictBlock(d){
@@ -314,10 +317,18 @@ function verdictBlock(d){
   const c = d.counts || {};
   if(d.verdict === 'COMPLIANT') return `<div class="verdict v-pass"><h3>Compliant</h3>
     <p>${c.passed} checks passed. No violation found.</p></div>`;
+  if(d.verdict === 'INCOMPLETE') return `<div class="verdict v-part"><h3>Check incomplete</h3>
+    <p>No violation found in what was visible, but ${c.recheck}
+    ${c.recheck === 1 ? 'declaration is' : 'declarations are'} printed on a part of the package
+    that was not photographed. Capture that panel and scan again.</p></div>`;
   const bits = [];
   if(c.major) bits.push(c.major + (c.major===1?' violation':' violations'));
   if(c.minor) bits.push(c.minor + (c.minor===1?' formatting defect':' formatting defects'));
-  return `<div class="verdict v-fail"><h3>Not compliant</h3><p>${bits.join(' and ')}.</p></div>`;
+  const tail = c.recheck
+    ? ` ${c.recheck} further ${c.recheck === 1 ? 'declaration is' : 'declarations are'} on a panel
+       that was not photographed.` : '';
+  return `<div class="verdict v-fail"><h3>Not compliant</h3>
+    <p>${bits.join(' and ')}.${tail}</p></div>`;
 }
 
 function findingBlock(v){
@@ -346,7 +357,7 @@ function fieldsTable(f){
 
 function renderReport(d){
   show('#report');
-  const order = {FAIL:0, INFO:1, PASS:2, SKIP:3};
+  const order = {FAIL:0, RECHECK:1, INFO:2, PASS:3, SKIP:4};
   const vs = (d.violations || []).slice().sort((a,b) => order[a.status] - order[b.status]);
   $('#report').innerHTML = `
     ${verdictBlock(d)}
@@ -376,7 +387,8 @@ function reset(){
 }
 
 const TAG = {COMPLIANT:['Compliant','var(--green)'], NON_COMPLIANT:['Not compliant','var(--stamp)'],
-             EXEMPT:['Exempt','var(--indigo)'], UNKNOWN:['—','var(--ink-2)']};
+             INCOMPLETE:['Incomplete','var(--ochre)'], EXEMPT:['Exempt','var(--indigo)'],
+             UNKNOWN:['—','var(--ink-2)']};
 
 async function loadHistory(){
   try{

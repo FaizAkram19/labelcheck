@@ -38,6 +38,23 @@ MRP_TAX_PHRASES = [
 MRP_LABELS = ["mrp", "m.r.p", "maximum retail price", "max retail price",
               "max. retail price", "retail price"]
 
+# Indian packaging very often carries the declaration in one place and a pointer
+# to it somewhere else - the price and packing date are commonly ink-jetted onto
+# the bottom or a crimp seal after the artwork is printed. A panel that says
+# "see bottom for MRP" has not omitted the price; we simply have not been shown
+# it. Reporting that as a violation would be wrong, and it is the first thing
+# anyone holding the packet would notice.
+CROSS_REFERENCE_PATTERNS = [
+    r"\bsee\s+(?:the\s+)?(?:bottom|top|back|side|reverse|cap|crimp|seal|pack|packet|"
+    r"pouch|carton|sachet|label|coding\s*area|code\s*area|batch\s*area|other\s*side)\b",
+    r"\brefer\s+to\s+(?:the\s+)?(?:bottom|back|side|pack|coding)",
+    r"\b(?:printed|marked|embossed|mentioned|indicated|stated|shown)\s+(?:on|at)\s+"
+    r"(?:the\s+)?(?:bottom|top|back|side|cap|crimp|seal|pack|coding\s*area|other\s*side)\b",
+    r"\bas\s+(?:printed|marked|mentioned)\s+(?:on|above|below)\b",
+    r"\bon\s+(?:the\s+)?(?:bottom|coding\s*area|crimp|cap|reverse)\s*(?:of\s+"
+    r"(?:the\s+)?(?:pack|packet|pouch|bottle))?\s*$",
+]
+
 _NUM = r"(\d+(?:[.,]\d+)?)"
 
 
@@ -141,6 +158,18 @@ def find_forbidden_counts(*texts):
 def find_vague_words(text):
     t = clean(text).lower()
     return [w for w in VAGUE_QUANTITY_WORDS if w in t]
+
+
+def points_elsewhere(text):
+    """True when the text is a pointer to another part of the package.
+
+    Distinguishes "the declaration is absent" from "the declaration is over
+    there" - two very different findings, only one of which is a violation.
+    """
+    t = clean(text).lower()
+    if not t:
+        return False
+    return any(re.search(p, t) for p in CROSS_REFERENCE_PATTERNS)
 
 
 def parse_month_year(text):
