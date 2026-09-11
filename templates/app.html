@@ -1,136 +1,12 @@
-{% load static %}<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Label compliance check</title>
-<style>
-:root{
-  --paper:#FBFAF7; --ink:#16202B; --ink-2:#54626F; --line:#D8DDE3;
-  --indigo:#1E3A5F; --stamp:#B22222; --ochre:#9A6B0F; --green:#1B6E3C;
-  --tint:#EDF1F5;
-}
-*{box-sizing:border-box}
-html,body{margin:0;padding:0}
-body{
-  background:var(--paper); color:var(--ink);
-  font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
-  font-variant-numeric:tabular-nums;
-  padding-bottom:env(safe-area-inset-bottom);
-}
-.wrap{max-width:560px;margin:0 auto;padding:0 18px 64px}
-header{border-bottom:2px solid var(--indigo);padding:18px 0 12px;margin-bottom:20px}
-h1{font-size:20px;line-height:1.25;margin:0 0 4px;letter-spacing:-.01em}
-header p{margin:0;color:var(--ink-2);font-size:13.5px}
-h2{font-size:15px;margin:26px 0 10px;letter-spacing:-.005em}
-button{font:inherit;cursor:pointer}
-.btn{
-  display:block;width:100%;padding:15px 18px;border:0;border-radius:3px;
-  background:var(--indigo);color:#fff;font-weight:600;font-size:16px;
-}
-.btn:disabled{background:#94A3B0;cursor:not-allowed}
-.btn.secondary{background:transparent;color:var(--indigo);border:1.5px solid var(--indigo)}
-.btn.quiet{background:transparent;color:var(--ink-2);border:1px solid var(--line);font-weight:500}
-:focus-visible{outline:3px solid var(--indigo);outline-offset:2px}
+{% extends "base.html" %}
+{% load static %}
 
-/* capture */
-.slot{
-  border:1.5px dashed var(--line);border-radius:4px;background:#fff;
-  padding:16px;margin-bottom:12px;display:flex;gap:14px;align-items:center;
-}
-.slot.filled{border-style:solid;border-color:var(--indigo)}
-.slot .thumb{width:64px;height:64px;border-radius:3px;object-fit:cover;background:var(--tint);flex:none}
-.slot .meta{flex:1;min-width:0}
-.slot .meta strong{display:block;font-size:14.5px}
-.slot .meta span{display:block;color:var(--ink-2);font-size:13px;margin-top:2px}
-.slot input[type=file]{display:none}
-.slot .actions{flex:none;display:flex;flex-direction:column;gap:6px}
-.slot label{
-  display:block;text-align:center;padding:8px 12px;border:1.5px solid var(--indigo);
-  border-radius:3px;color:var(--indigo);font-weight:600;font-size:13.5px;cursor:pointer;
-  white-space:nowrap;
-}
-.slot label.alt{border-color:var(--line);color:var(--ink-2);font-weight:500}
-.bulk{border:1px solid var(--line);border-radius:4px;background:#fff;padding:14px 16px;margin-top:14px}
-.bulk h3{margin:0 0 4px;font-size:14.5px}
-.bulk p{margin:0 0 12px;color:var(--ink-2);font-size:13.5px;line-height:1.45}
-.bulk input[type=file]{display:none}
-.bulk label{
-  display:block;text-align:center;padding:11px;border:1.5px solid var(--indigo);
-  border-radius:3px;color:var(--indigo);font-weight:600;font-size:14.5px;cursor:pointer;
-}
-.queue{margin-top:12px;font-size:13.5px}
-.queue div{padding:6px 0;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:10px}
-.queue .st{flex:none;font-weight:600}
-.q-wait{color:var(--ink-2)}.q-run{color:var(--indigo)}.q-ok{color:var(--green)}.q-err{color:var(--stamp)}
-details{border-top:1px solid var(--line);padding-top:12px;margin-top:8px}
-summary{cursor:pointer;color:var(--ink-2);font-size:14px}
-.flags{margin-top:12px;display:grid;gap:10px}
-.flags label{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.4}
-.flags input{margin-top:3px;flex:none;width:18px;height:18px}
-.hint{color:var(--ink-2);font-size:13.5px;margin:10px 0 18px;line-height:1.45}
-
-/* verdict */
-.verdict{border:2px solid;border-radius:4px;padding:16px 18px;margin-bottom:6px}
-.verdict h3{margin:0 0 4px;font-size:19px;letter-spacing:-.01em}
-.verdict p{margin:0;font-size:14px}
-.v-fail{border-color:var(--stamp);background:#FCF3F2;color:var(--stamp)}
-.v-pass{border-color:var(--green);background:#F1F7F3;color:var(--green)}
-.v-exempt{border-color:var(--indigo);background:var(--tint);color:var(--indigo)}
-.v-part{border-color:var(--ochre);background:#FCF7EC;color:var(--ochre)}
-.verdict p{color:var(--ink)}
-.scanned{color:var(--ink-2);font-size:13px;margin:0 0 20px}
-
-/* findings */
-.finding{border-top:1px solid var(--line);padding:14px 0 14px 34px;position:relative}
-.finding:last-child{border-bottom:1px solid var(--line)}
-.mark{position:absolute;left:0;top:15px;width:22px;text-align:center;font-weight:700;font-size:15px}
-.m-fail{color:var(--stamp)}.m-pass{color:var(--green)}.m-skip{color:var(--ink-2)}
-.m-info{color:var(--indigo)}.m-recheck{color:var(--ochre)}
-.finding .top{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
-.finding .name{font-weight:600;font-size:15px}
-.cite{
-  flex:none;font-size:12.5px;color:var(--indigo);border:1px solid var(--line);
-  border-radius:3px;padding:2px 7px;background:#fff;white-space:nowrap;
-}
-.finding .msg{font-size:14px;color:var(--ink-2);margin-top:5px;line-height:1.45}
-.finding .obs{font-size:13.5px;margin-top:6px;padding:7px 10px;background:var(--tint);border-radius:3px;word-break:break-word}
-.sev{font-size:12.5px;font-weight:600;margin-top:6px}
-.s-MAJOR{color:var(--stamp)}.s-MINOR{color:var(--ochre)}
-.unverified{color:var(--ochre);font-size:12.5px;margin-top:5px}
-
-/* fields + history */
-table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:8px}
-td{border-top:1px solid var(--line);padding:7px 0;vertical-align:top}
-td:first-child{color:var(--ink-2);width:42%;padding-right:12px}
-.hist{border-top:1px solid var(--line)}
-.hist button{
-  display:block;width:100%;text-align:left;background:none;border:0;
-  border-bottom:1px solid var(--line);padding:13px 0;color:inherit;
-}
-.hist .row{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
-.hist .name{font-weight:600;font-size:14.5px}
-.hist .tag{flex:none;font-size:12.5px;font-weight:600}
-.hist .sub{color:var(--ink-2);font-size:13px;margin-top:2px}
-.error{border:1.5px solid var(--stamp);background:#FCF3F2;border-radius:4px;padding:14px 16px;font-size:14px;line-height:1.5}
-.error strong{display:block;margin-bottom:4px;color:var(--stamp)}
-.spin{display:flex;gap:12px;align-items:center;color:var(--ink-2);font-size:15px;padding:22px 0}
-.dot{width:11px;height:11px;border-radius:50%;background:var(--indigo);animation:p 1.1s infinite ease-in-out}
-@keyframes p{0%,100%{opacity:.25}50%{opacity:1}}
-@media (prefers-reduced-motion:reduce){.dot{animation:none;opacity:.7}}
-.hide{display:none}
-footer{margin-top:34px;padding-top:14px;border-top:1px solid var(--line);color:var(--ink-2);font-size:12.5px;line-height:1.5}
-</style>
-</head>
-<body>
-<div class="wrap">
-
+{% block content %}
 <header>
   <h1>Packaged commodity label check</h1>
   <p>Legal Metrology (Packaged Commodities) Rules, 2011</p>
 </header>
 
-<!-- CAPTURE ------------------------------------------------------------ -->
 <section id="capture">
   <div class="slot" id="slot-dec">
     <img class="thumb" id="thumb-dec" alt="">
@@ -164,11 +40,11 @@ footer{margin-top:34px;padding-top:14px;border-top:1px solid var(--line);color:v
     <summary>This package is exempt from the Rules</summary>
     <div class="flags">
       <label><input type="checkbox" id="f-rest">
-        Fast food packed by a restaurant or hotel — Rule 26(b)</label>
+        Fast food packed by a restaurant or hotel &mdash; Rule 26(b)</label>
       <label><input type="checkbox" id="f-drug">
-        Formulation under the Drugs (Price Control) Order, 1995 — Rule 26(c)</label>
+        Formulation under the Drugs (Price Control) Order, 1995 &mdash; Rule 26(c)</label>
       <label><input type="checkbox" id="f-inst">
-        Sold to an industrial or institutional consumer — Rule 3(b)</label>
+        Sold to an industrial or institutional consumer &mdash; Rule 3(b)</label>
     </div>
   </details>
 
@@ -187,18 +63,15 @@ footer{margin-top:34px;padding-top:14px;border-top:1px solid var(--line);color:v
   </div>
 </section>
 
-<!-- WORKING ------------------------------------------------------------ -->
 <section id="working" class="hide">
-  <div class="spin"><span class="dot"></span> Reading the label…</div>
+  <div class="spin"><span class="dot"></span> Reading the label&hellip;</div>
 </section>
 
-<!-- REPORT ------------------------------------------------------------- -->
 <section id="report" class="hide"></section>
 
-<!-- HISTORY ------------------------------------------------------------ -->
 <section id="history-wrap">
   <h2>Earlier checks</h2>
-  <p class="hint" style="margin-top:-4px">Stored on the server. Opening one needs no network
+  <p class="hint hint--pull">Stored on the server. Opening one needs no network
   call to the reader, so these work when the connection does not.</p>
   <div class="hist" id="history"></div>
 </section>
@@ -207,219 +80,9 @@ footer{margin-top:34px;padding-top:14px;border-top:1px solid var(--line);color:v
   The label is read by a vision model; every pass or fail below it is decided by the rule
   engine, not the model. Each check names the rule it applies.
 </footer>
+{% endblock %}
 
-</div>
-
-<script>
-const $ = s => document.querySelector(s);
-const files = {DECLARATION:null, FRONT:null};
-
-function bindSlot(kind, inputIds, thumbId, slotId, lblId, capId){
-  inputIds.forEach(inputId => $(inputId).addEventListener('change', e => {
-    const f = e.target.files[0];
-    if(!f) return;
-    files[kind] = f;
-    $(thumbId).src = URL.createObjectURL(f);
-    $(slotId).classList.add('filled');
-    $(lblId).textContent = 'Retake';
-    $(capId).textContent = f.name.length > 28 ? f.name.slice(0,28) + '\u2026' : f.name;
-    $('#go').disabled = !files.DECLARATION;
-  }));
-}
-bindSlot('DECLARATION',['#cam-dec','#file-dec'],'#thumb-dec','#slot-dec','#lbl-dec','#cap-dec');
-bindSlot('FRONT',['#cam-front','#file-front'],'#thumb-front','#slot-front','#lbl-front','#cap-front');
-
-// --- bulk ----------------------------------------------------------------
-// Strictly one at a time. Firing them in parallel would hit the free-tier rate
-// limit immediately and most of the batch would come back as 429s.
-$('#file-bulk').addEventListener('change', async e => {
-  const picked = Array.from(e.target.files);
-  if(!picked.length) return;
-  e.target.value = '';
-
-  const rows = picked.map((f,i) => {
-    const id = 'q' + Date.now() + i;
-    return {id, file:f, name: f.name.length > 30 ? f.name.slice(0,30)+'\u2026' : f.name};
-  });
-  $('#queue').innerHTML = rows.map(r =>
-    `<div id="${r.id}"><span>${esc(r.name)}</span><span class="st q-wait">waiting</span></div>`
-  ).join('');
-
-  const setState = (id, cls, text) => {
-    const el = document.querySelector('#' + id + ' .st');
-    if(el){ el.className = 'st ' + cls; el.textContent = text; }
-  };
-
-  for(const r of rows){
-    setState(r.id, 'q-run', 'checking\u2026');
-    const fd = new FormData();
-    fd.append('images', r.file);
-    fd.append('panels', 'DECLARATION');
-    try{
-      const resp = await fetch('/api/scans/create/', {method:'POST', body:fd});
-      const data = await resp.json();
-      if(!resp.ok){ setState(r.id, 'q-err', 'failed'); continue; }
-      const label = {COMPLIANT:'compliant', NON_COMPLIANT:'not compliant',
-                     EXEMPT:'exempt'}[data.verdict] || 'done';
-      setState(r.id, data.verdict === 'COMPLIANT' ? 'q-ok' : 'q-err', label);
-    }catch(err){
-      setState(r.id, 'q-err', 'failed');
-    }
-    loadHistory();
-  }
-});
-
-const show = id => {
-  ['#capture','#working','#report'].forEach(s => $(s).classList.add('hide'));
-  $(id).classList.remove('hide');
-};
-
-$('#go').addEventListener('click', async () => {
-  const fd = new FormData();
-  const panels = [];
-  if(files.DECLARATION){ fd.append('images', files.DECLARATION); panels.push('DECLARATION'); }
-  if(files.FRONT){ fd.append('images', files.FRONT); panels.push('FRONT'); }
-  panels.forEach(p => fd.append('panels', p));
-  if($('#f-rest').checked) fd.append('restaurant_packed','1');
-  if($('#f-drug').checked) fd.append('drug_price_control','1');
-  if($('#f-inst').checked) fd.append('institutional','1');
-
-  show('#working');
-  $('#history-wrap').classList.add('hide');
-  try{
-    const r = await fetch('/api/scans/create/', {method:'POST', body:fd});
-    const data = await r.json();
-    if(!r.ok){ renderError(data); return; }
-    renderReport(data);
-    loadHistory();
-  }catch(err){
-    renderError({detail:'Could not reach the server. Check that the phone and the laptop are on the same network.'});
-  }
-});
-
-function renderError(data){
-  show('#report');
-  $('#report').innerHTML = `
-    <div class="error"><strong>The label could not be read</strong>
-    ${esc(data.detail || 'Unknown error.')}
-    ${data.hint ? '<br><br>' + esc(data.hint) : ''}</div>
-    <button class="btn secondary" style="margin-top:16px" onclick="reset()">Try again</button>`;
-  $('#history-wrap').classList.remove('hide');
-}
-
-const MARK = {PASS:['m-pass','✓'], FAIL:['m-fail','✕'], SKIP:['m-skip','–'],
-              RECHECK:['m-recheck','?'], INFO:['m-info','i']};
-const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-
-function verdictBlock(d){
-  if(d.verdict === 'EXEMPT') return `<div class="verdict v-exempt"><h3>Outside the Rules</h3>
-    <p>${esc(d.exempt_reason)}</p></div>`;
-  const c = d.counts || {};
-  if(d.verdict === 'COMPLIANT') return `<div class="verdict v-pass"><h3>Compliant</h3>
-    <p>${c.passed} checks passed. No violation found.</p></div>`;
-  if(d.verdict === 'INCOMPLETE') return `<div class="verdict v-part"><h3>Check incomplete</h3>
-    <p>No violation found in what was visible, but ${c.recheck}
-    ${c.recheck === 1 ? 'declaration is' : 'declarations are'} printed on a part of the package
-    that was not photographed. Capture that panel and scan again.</p></div>`;
-  const bits = [];
-  if(c.major) bits.push(c.major + (c.major===1?' violation':' violations'));
-  if(c.minor) bits.push(c.minor + (c.minor===1?' formatting defect':' formatting defects'));
-  const tail = c.recheck
-    ? ` ${c.recheck} further ${c.recheck === 1 ? 'declaration is' : 'declarations are'} on a panel
-       that was not photographed.` : '';
-  return `<div class="verdict v-fail"><h3>Not compliant</h3>
-    <p>${bits.join(' and ')}.${tail}</p></div>`;
-}
-
-function findingBlock(v){
-  const [cls, glyph] = MARK[v.status] || MARK.SKIP;
-  return `<div class="finding">
-    <span class="mark ${cls}" aria-hidden="true">${glyph}</span>
-    <div class="top"><span class="name">${esc(v.title)}</span>
-      <span class="cite">${esc(v.citation)}</span></div>
-    <div class="msg">${esc(v.message)}</div>
-    ${v.observed ? `<div class="obs">On the label: ${esc(v.observed)}</div>` : ''}
-    ${v.status==='FAIL' && v.severity!=='INFO'
-      ? `<div class="sev s-${esc(v.severity)}">${v.severity==='MAJOR'
-          ? 'Legal violation' : 'Formatting defect'}</div>` : ''}
-    ${v.verified === false ? `<div class="unverified">Citation not yet verified against the Gazette text.</div>` : ''}
-  </div>`;
-}
-
-function fieldsTable(f){
-  const rows = Object.entries(f || {}).filter(([,v]) => v);
-  if(!rows.length) return '';
-  return `<details style="margin-top:24px"><summary>What was read off the label (${rows.length} fields)</summary>
-    <table>${rows.map(([k,v]) =>
-      `<tr><td>${esc(k.replace(/_/g,' '))}</td><td>${esc(v)}</td></tr>`).join('')}</table>
-    </details>`;
-}
-
-function renderReport(d){
-  show('#report');
-  const order = {FAIL:0, RECHECK:1, INFO:2, PASS:3, SKIP:4};
-  const vs = (d.violations || []).slice().sort((a,b) => order[a.status] - order[b.status]);
-  $('#report').innerHTML = `
-    ${verdictBlock(d)}
-    <p class="scanned">${esc(d.product_label || 'Unnamed product')} · check #${d.id}</p>
-    ${vs.map(findingBlock).join('')}
-    ${fieldsTable(d.fields_read)}
-    ${(d.unclear && d.unclear.length) ? `<p class="hint" style="margin-top:14px">
-      Read with low confidence: ${d.unclear.map(f => esc(f.replace(/_/g,' '))).join(', ')}.
-      Retake the photo if a finding above looks wrong.</p>` : ''}
-    ${d.notes ? `<p class="hint" style="margin-top:8px">Reader note: ${esc(d.notes)}</p>` : ''}
-    <button class="btn secondary" style="margin-top:22px" onclick="reset()">Check another package</button>`;
-  $('#history-wrap').classList.remove('hide');
-  window.scrollTo(0,0);
-}
-
-function reset(){
-  files.DECLARATION = files.FRONT = null;
-  ['#cam-dec','#file-dec','#cam-front','#file-front'].forEach(s => $(s).value = '');
-  ['#slot-dec','#slot-front'].forEach(s => $(s).classList.remove('filled'));
-  $('#thumb-dec').removeAttribute('src'); $('#thumb-front').removeAttribute('src');
-  $('#lbl-dec').textContent = 'Take photo'; $('#lbl-front').textContent = 'Take photo';
-  $('#cap-dec').textContent = 'The side with the fine print. Required.';
-  $('#cap-front').textContent = 'Add it if the price or quantity is on the front.';
-  $('#go').disabled = true;
-  show('#capture'); $('#history-wrap').classList.remove('hide');
-  window.scrollTo(0,0);
-}
-
-const TAG = {COMPLIANT:['Compliant','var(--green)'], NON_COMPLIANT:['Not compliant','var(--stamp)'],
-             INCOMPLETE:['Incomplete','var(--ochre)'], EXEMPT:['Exempt','var(--indigo)'],
-             UNKNOWN:['—','var(--ink-2)']};
-
-async function loadHistory(){
-  try{
-    const r = await fetch('/api/scans/');
-    const list = await r.json();
-    if(!list.length){
-      $('#history').innerHTML = `<p class="hint">Nothing checked yet.</p>`; return;
-    }
-    $('#history').innerHTML = list.map(s => {
-      const [text,color] = TAG[s.verdict] || TAG.UNKNOWN;
-      const c = s.counts || {};
-      const detail = s.verdict === 'NON_COMPLIANT'
-        ? `${c.major||0} violations, ${c.minor||0} defects` : '';
-      return `<button onclick="openScan(${s.id})">
-        <span class="row"><span class="name">${esc(s.product_label || 'Unnamed product')}</span>
-        <span class="tag" style="color:${color}">${text}</span></span>
-        <span class="sub">#${s.id}${detail ? ' · ' + detail : ''}${s.is_demo ? ' · example' : ''}</span>
-      </button>`;
-    }).join('');
-  }catch(e){ $('#history').innerHTML = `<p class="hint">History unavailable.</p>`; }
-}
-
-async function openScan(id){
-  show('#working');
-  try{
-    const r = await fetch('/api/scans/' + id + '/');
-    renderReport(await r.json());
-  }catch(e){ renderError({detail:'Could not load that check.'}); }
-}
-
-loadHistory();
-</script>
-</body>
-</html>
+{% block scripts %}
+<script src="{% static 'js/api.js' %}"></script>
+<script src="{% static 'js/app.js' %}"></script>
+{% endblock %}
