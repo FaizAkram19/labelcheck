@@ -3,11 +3,33 @@
    in app.js builds a URL of its own. */
 
 const API = {
-  /* Returns { ok, data } rather than throwing, because a rejected scan still
+  /* XMLHttpRequest rather than fetch, because only XHR reports upload bytes -
+     and on a phone over venue wifi the upload is a real part of the wait.
+     Returns { ok, data } rather than throwing, because a rejected scan still
      carries a message the user needs to see. */
-  async createScan(body){
-    const response = await fetch('/api/scans/create/', {method:'POST', body});
-    return {ok: response.ok, data: await response.json()};
+  createScan(body, onUploadProgress){
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/scans/create/');
+      if(onUploadProgress && xhr.upload){
+        xhr.upload.addEventListener('progress', e => {
+          if(e.lengthComputable) onUploadProgress(e.loaded / e.total);
+        });
+      }
+      xhr.addEventListener('load', () => {
+        let data;
+        try{
+          data = JSON.parse(xhr.responseText);
+        }catch(err){
+          reject(new Error('The server sent a reply the app could not read.'));
+          return;
+        }
+        resolve({ok: xhr.status >= 200 && xhr.status < 300, data});
+      });
+      xhr.addEventListener('error', () => reject(new Error('Network error.')));
+      xhr.addEventListener('abort', () => reject(new Error('Upload cancelled.')));
+      xhr.send(body);
+    });
   },
 
   async scan(id){

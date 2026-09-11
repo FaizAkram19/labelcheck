@@ -143,18 +143,18 @@ button{font:inherit;cursor:pointer}
 
 /* ---- the wait --------------------------------------------------------- */
 .working{padding:40px 0}
-.progress{height:4px;border-radius:2px;background:var(--tint);overflow:hidden}
-.progress span{
-  display:block;width:38%;height:100%;border-radius:2px;background:var(--indigo);
-  animation:sweep 1.5s ease-in-out infinite;
+.progress{height:6px;border-radius:3px;background:var(--tint);overflow:hidden}
+.progress__fill{
+  display:block;width:0;height:100%;border-radius:3px;background:var(--indigo);
+  transition:width .28s ease-out;
 }
-@keyframes sweep{
-  0%{transform:translateX(-100%)}
-  100%{transform:translateX(320%)}
-}
+.working__row{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
 .working__stage{margin:14px 0 0;color:var(--ink-2);font-size:14.5px}
+.working__pct{
+  flex:none;margin-top:14px;font-size:15px;font-weight:700;color:var(--indigo);
+}
 @media (prefers-reduced-motion:reduce){
-  .progress span{animation:none;width:100%;opacity:.6}
+  .progress__fill{transition:none}
 }
 
 /* ---- verdict ---------------------------------------------------------- */

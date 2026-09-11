@@ -58,21 +58,75 @@ function reset(){
 
 
 /* ---- the wait --------------------------------------------------------- */
-/* A scan takes several seconds and almost all of it is the vision model. One
-   frozen line of text for that long reads as a hang, so the stages name what is
-   happening - which is also the pipeline we want a judge to notice. */
+/* A scan takes ten seconds or so and the server reports nothing until it is
+   done, so the bar is honest about only part of this. The upload share is real
+   - the browser counts the bytes. The rest is modelled on elapsed time and
+   eases toward a ceiling it never reaches, so the bar cannot sit at 99% while
+   the model is still thinking. Completion is the only thing that fills it. */
 
-function startStages(){
-  const stages = [
-    [0,    'Uploading the photos'],
-    [1400, 'Reading the declarations off the label'],
-    [4000, ruleCount ? `Checking ${ruleCount} rules` : 'Checking against the Rules'],
-  ];
-  const timers = stages.map(([delay, text]) =>
-    setTimeout(() => { $('#stage').textContent = text; }, delay));
-  return () => timers.forEach(clearTimeout);
+const UPLOAD_SHARE = 25;   // percent of the bar the upload is worth
+const CEILING = 88;        // the model phase creeps toward this, never past it
+const MODEL_MS = 11000;    // rough time a Gemini call takes on a good link
+
+function stageText(value){
+  if(value < UPLOAD_SHARE) return 'Uploading the photos';
+  if(value < 62) return 'Reading the declarations off the label';
+  return ruleCount ? `Checking ${ruleCount} rules` : 'Checking against the Rules';
 }
 
+function startProgress(){
+  const fill = $('#fill'), pct = $('#pct'), stage = $('#stage');
+  const began = Date.now();
+  let value = 0, uploadFraction = 0, sawBytes = false;
+  let uploadDone = false, modelBegan = 0;
+
+  const paint = () => {
+    fill.style.width = value.toFixed(1) + '%';
+    pct.textContent = Math.round(value) + '%';
+    stage.textContent = stageText(value);
+  };
+  paint();
+
+  const timer = setInterval(() => {
+    let target;
+    if(!uploadDone){
+      /* If the browser never fires upload progress events, fall back to a
+         timed crawl so the bar does not sit frozen at zero. */
+      const elapsed = Date.now() - began;
+      target = sawBytes ? uploadFraction * UPLOAD_SHARE
+                        : Math.min(UPLOAD_SHARE, elapsed / 2500 * UPLOAD_SHARE);
+      if(!sawBytes && target >= UPLOAD_SHARE){
+        uploadDone = true; modelBegan = Date.now();
+      }
+    }else{
+      const t = (Date.now() - modelBegan) / MODEL_MS;
+      target = UPLOAD_SHARE + (CEILING - UPLOAD_SHARE) * (1 - Math.exp(-2.2 * t));
+    }
+    value = Math.max(value, target);
+    paint();
+  }, 120);
+
+  return {
+    onUpload(fraction){
+      sawBytes = true;
+      uploadFraction = fraction;
+      if(fraction >= 1 && !uploadDone){
+        uploadDone = true; modelBegan = Date.now();
+      }
+    },
+    /* Fills the bar and holds for a beat, so the jump to 100 is seen rather
+       than skipped straight past into the report. */
+    async finish(){
+      clearInterval(timer);
+      value = 100;
+      fill.style.width = '100%';
+      pct.textContent = '100%';
+      stage.textContent = 'Done';
+      await new Promise(r => setTimeout(r, 320));
+    },
+    stop(){ clearInterval(timer); },
+  };
+}
 
 /* ---- single check ----------------------------------------------------- */
 
@@ -88,16 +142,16 @@ $('#go').addEventListener('click', async () => {
 
   show('#working');
   $('#history-wrap').classList.add('hide');
-  const stopStages = startStages();
+  const progress = startProgress();
   try{
-    const {ok, data} = await API.createScan(fd);
-    if(!ok){ renderError(data); return; }
+    const {ok, data} = await API.createScan(fd, f => progress.onUpload(f));
+    if(!ok){ progress.stop(); renderError(data); return; }
+    await progress.finish();
     renderReport(data);
     loadHistory();
   }catch(err){
+    progress.stop();
     renderError({detail:'Could not reach the server. Check that the phone and the laptop are on the same network.'});
-  }finally{
-    stopStages();
   }
 });
 
@@ -311,6 +365,8 @@ async function loadHistory(){
 
 async function openScan(id){
   show('#working');
+  $('#fill').style.width = '100%';
+  $('#pct').textContent = '';
   $('#stage').textContent = 'Opening the check';
   try{
     renderReport(await API.scan(id));
