@@ -131,8 +131,8 @@ after any change to `engine/`.
 
 ## 👥 Team
 
-| Name | Role |
-| :--- | :--- |
+| Name | Role | GitHub |
+| :--- | :--- | :--- |
 | Faiz Akram | Lead Developer | [@FaizAkram19](https://github.com/FaizAkram19) |
 | Junaid Alam | Testing & QA | [@Junaid933-cpu](https://github.com/Junaid933-cpu) |
 | Shrestho Sen | Frontend & UI | [@shresthosen](https://github.com/shresthosen)|
