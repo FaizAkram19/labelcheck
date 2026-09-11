@@ -129,9 +129,13 @@ python manage.py test compliance
 and a blank label. No network, no images. They run in under a second, so run them
 after any change to `engine/`.
 
-## Demo day
+## 👥 Team
 
-Seeded examples and every real scan replay from the database with no network
-call. If the venue connection dies, open a stored check from the history and the
-demo continues. Scan a few real products in the morning so the history holds
-genuine results rather than seeded ones.
+| Name | Role |
+| :--- | :--- |
+| Faiz Akram | Lead Developer |
+| Junaid Alam | Testing & QA |
+| Shrestho Sen | Frontend & UI |
+| Somridhya Ghosh | Database Design |
+| Ritam Nag | Documentation |
+| Prithwijit Pal | Research & Analysis |
