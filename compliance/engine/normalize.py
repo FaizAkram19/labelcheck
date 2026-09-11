@@ -178,7 +178,10 @@ def parse_month_year(text):
     if not t:
         return None
     months = ("jan feb mar apr may jun jul aug sep oct nov dec")
-    if re.search(r"\b(" + "|".join(months.split()) + r")[a-z]*\.?\s*,?\s*(19|20)?\d{2}\b", t):
+    # The separator after a month name may be a space, comma, full stop, slash
+    # or hyphen. Ink-jetted date codes on Indian packs very often read "JUN/26",
+    # so refusing the slash here reported valid labels as missing the date.
+    if re.search(r"\b(" + "|".join(months.split()) + r")[a-z]*\.?\s*[,/\-.]?\s*(19|20)?\d{2}\b", t):
         return {"found": True, "text": clean(text)}
     if re.search(r"\b(0?[1-9]|1[0-2])\s*[/\-.]\s*((19|20)?\d{2})\b", t):
         return {"found": True, "text": clean(text)}

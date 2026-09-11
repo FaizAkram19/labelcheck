@@ -2,6 +2,7 @@
 from django.core.management import call_command
 from django.test import TestCase
 
+from .engine.normalize import parse_month_year
 from .engine.runner import evaluate
 from .models import Rule, StandardPackSize
 
@@ -276,3 +277,31 @@ class CrossReferenceTests(EngineTests):
         verdict, _, results = self.run_engine(good_biscuit())
         self.assertEqual(verdict, "COMPLIANT")
         self.assertNotIn("RECHECK", self.statuses(results).values())
+
+class MonthYearParsingTests(TestCase):
+    """Rule 6(1)(d) accepts words, numerals or both.
+
+    Regression guard: "JUN/26" on a Milkybar was reported as a missing
+    manufacture date because the month-name branch allowed a comma or a full
+    stop after the month but not a slash.
+    """
+
+    ACCEPTED = [
+        "JUN/26", "MAY/27", "JUN-26", "JUN.26", "Jun/2026", "JUNE/2026",
+        "JUN 2026", "June, 2026", "JUN2026", "MFD: JUN/26", "Packed JUL/25",
+        "06/2026", "06/26", "2026/06",
+    ]
+    REJECTED = ["SEE CODING AREA", "BATCH 61720454X1", "L7A", "20:08"]
+
+    def test_real_label_formats_are_accepted(self):
+        for text in self.ACCEPTED:
+            with self.subTest(text=text):
+                self.assertTrue(parse_month_year(text)["found"])
+
+    def test_non_dates_are_still_rejected(self):
+        for text in self.REJECTED:
+            with self.subTest(text=text):
+                self.assertFalse(parse_month_year(text)["found"])
+
+    def test_empty_text_has_no_date(self):
+        self.assertIsNone(parse_month_year(""))
