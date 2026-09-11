@@ -133,9 +133,9 @@ after any change to `engine/`.
 
 | Name | Role |
 | :--- | :--- |
-| Faiz Akram | Lead Developer |
-| Junaid Alam | Testing & QA |
-| Shrestho Sen | Frontend & UI |
-| Somridhya Ghosh | Database Design |
-| Ritam Nag | Documentation |
-| Prithwijit Pal | Research & Analysis |
+| Faiz Akram | Lead Developer | [@FaizAkram19](https://github.com/FaizAkram19) |
+| Junaid Alam | Testing & QA | [@Junaid933-cpu](https://github.com/Junaid933-cpu) |
+| Shrestho Sen | Frontend & UI | [@shresthosen](https://github.com/shresthosen)|
+| Somridhya Ghosh | Database Design | [@so-mo-git](https://github.com/so-mo-git) |
+| Ritam Nag | Documentation | [@ritamnag0001-kl](https://github.com/ritamnag0001-kl) |
+| Prithwijit Pal | Research & Analysis | [@jeet-prithvi](https://github.com/jeet-prithvi) |
