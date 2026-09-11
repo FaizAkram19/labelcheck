@@ -188,19 +188,40 @@ function shotsStrip(images){
     </a>`).join('')}</div>`;
 }
 
+/* Title gets the full width. The citation sits in the footer with the severity,
+   where a long one like "Rule 5 and Second Schedule" cannot squeeze it. */
 function findingBlock(v){
   const [cls, glyph] = MARK[v.status] || MARK.SKIP;
+  const severity = v.status === 'FAIL' && v.severity !== 'INFO'
+    ? `<span class="sev s-${esc(v.severity)}">${v.severity === 'MAJOR'
+        ? 'Legal violation' : 'Formatting defect'}</span>` : '';
   return `<div class="finding">
     <span class="mark ${cls}" aria-hidden="true">${glyph}</span>
-    <div class="top"><span class="name">${esc(v.title)}</span>
-      <span class="cite">${esc(v.citation)}</span></div>
+    <span class="name">${esc(v.title)}</span>
     <div class="msg">${esc(v.message)}</div>
     ${v.observed ? `<div class="obs">On the label: ${esc(v.observed)}</div>` : ''}
-    ${v.status==='FAIL' && v.severity!=='INFO'
-      ? `<div class="sev s-${esc(v.severity)}">${v.severity==='MAJOR'
-          ? 'Legal violation' : 'Formatting defect'}</div>` : ''}
-    ${v.verified === false ? `<div class="unverified">Citation not yet verified against the Gazette text.</div>` : ''}
+    <div class="foot">
+      <span class="cite">${esc(v.citation)}</span>
+      ${severity}
+      ${v.verified === false ? `<span class="unverified">Citation unverified</span>` : ''}
+    </div>
   </div>`;
+}
+
+/* Passes and non-applicable checks fold away. A judge should meet the verdict,
+   then the breaches - not scroll eleven green ticks to find the one red cross.
+   The count stays visible so the thoroughness is still on show. */
+function quietBlock(quiet, openByDefault){
+  if(!quiet.length) return '';
+  const passed = quiet.filter(v => v.status === 'PASS').length;
+  const skipped = quiet.length - passed;
+  const bits = [];
+  if(passed) bits.push(`${passed} ${passed === 1 ? 'check' : 'checks'} passed`);
+  if(skipped) bits.push(`${skipped} not applicable`);
+  return `<details class="disclose" ${openByDefault ? 'open' : ''}>
+    <summary>${bits.join(', ')}</summary>
+    <div class="findings findings--quiet">${quiet.map(findingBlock).join('')}</div>
+  </details>`;
 }
 
 function fieldsTable(f){
@@ -217,11 +238,17 @@ function renderReport(d){
   show('#report');
   const order = {FAIL:0, RECHECK:1, INFO:2, PASS:3, SKIP:4};
   const vs = (d.violations || []).slice().sort((a,b) => order[a.status] - order[b.status]);
+  const loud = vs.filter(v => v.status === 'FAIL' || v.status === 'RECHECK' || v.status === 'INFO');
+  const quiet = vs.filter(v => v.status === 'PASS' || v.status === 'SKIP');
+  /* Nothing to answer for, so the passes open on their own - the thoroughness
+     is the point of a clean report. */
+  const clean = !vs.some(v => v.status === 'FAIL' || v.status === 'RECHECK');
   $('#report').innerHTML = `
     ${verdictBlock(d)}
     <p class="scanned">${esc(d.product_label || 'Unnamed product')} \u00b7 check #${d.id}</p>
     ${shotsStrip(d.images)}
-    ${vs.map(findingBlock).join('')}
+    ${loud.length ? `<div class="findings">${loud.map(findingBlock).join('')}</div>` : ''}
+    ${quietBlock(quiet, clean)}
     ${fieldsTable(d.fields_read)}
     ${(d.unclear && d.unclear.length) ? `<p class="tip tip--gap">
       Read with low confidence: ${d.unclear.map(f => esc(f.replace(/_/g,' '))).join(', ')}.
