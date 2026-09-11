@@ -24,7 +24,7 @@ to "how do you know the AI isn't making this up".
 
 ## Running it
 
-Nothing here costs money. Free-tier extraction API, SQLite, your own laptop.
+Free-tier extraction API, SQLite, your own laptop.
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
