@@ -21,4 +21,16 @@ const API = {
     if(!response.ok) throw new Error('History could not be loaded.');
     return response.json();
   },
+
+  async rules(){
+    const response = await fetch('/api/rules/');
+    if(!response.ok) throw new Error('Rule catalogue could not be loaded.');
+    return response.json();
+  },
+
+  async health(){
+    const response = await fetch('/api/health/');
+    if(!response.ok) throw new Error('Health check failed.');
+    return response.json();
+  },
 };

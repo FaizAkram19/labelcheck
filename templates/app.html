@@ -1,42 +1,56 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block content %}
-<header>
-  <h1>Packaged commodity label check</h1>
-  <p>Legal Metrology (Packaged Commodities) Rules, 2011</p>
-</header>
+{% block nav %}<a class="appbar__link" href="{% url 'rules-page' %}">Rules</a>{% endblock %}
 
+{% block content %}
 <section id="capture">
+  <h1 class="page-title">Check a package label</h1>
+  <p class="lede">Photograph the panel with the fine print. Every declaration is read off the
+  label and checked against the Legal Metrology (Packaged Commodities) Rules, 2011.</p>
+
   <div class="slot" id="slot-dec">
-    <img class="thumb" id="thumb-dec" alt="">
+    <label class="shot" for="cam-dec">
+      <img class="shot__img" id="thumb-dec" alt="" hidden>
+      <svg class="shot__ph" id="ph-dec" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2.2l1.1-1.8A1.5 1.5 0 0 1 9.1 4.5h5.8a1.5 1.5 0 0 1 1.3.7L17.3 7h2.2A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"/>
+        <circle cx="12" cy="13" r="3.4"/>
+      </svg>
+    </label>
     <div class="meta">
       <strong>Declaration panel</strong>
-      <span id="cap-dec">The side with the fine print. Required.</span>
-    </div>
-    <div class="actions">
-      <label for="cam-dec" id="lbl-dec">Take photo</label>
-      <label for="file-dec" class="alt">Upload</label>
+      <span class="cap" id="cap-dec">The side with the fine print. Required.</span>
+      <div class="buttons">
+        <label for="cam-dec" id="lbl-dec">Take photo</label>
+        <label for="file-dec" class="alt">Upload</label>
+      </div>
     </div>
     <input type="file" id="cam-dec" accept="image/*" capture="environment">
     <input type="file" id="file-dec" accept="image/*">
   </div>
 
   <div class="slot" id="slot-front">
-    <img class="thumb" id="thumb-front" alt="">
+    <label class="shot" for="cam-front">
+      <img class="shot__img" id="thumb-front" alt="" hidden>
+      <svg class="shot__ph" id="ph-front" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 6.5v11M6.5 12h11"/>
+      </svg>
+    </label>
     <div class="meta">
       <strong>Front panel</strong>
-      <span id="cap-front">Add it if the price or quantity is on the front.</span>
-    </div>
-    <div class="actions">
-      <label for="cam-front" id="lbl-front">Take photo</label>
-      <label for="file-front" class="alt">Upload</label>
+      <span class="cap" id="cap-front">Add it if the price or quantity is on the front.</span>
+      <div class="buttons">
+        <label for="cam-front" id="lbl-front">Take photo</label>
+        <label for="file-front" class="alt">Upload</label>
+      </div>
     </div>
     <input type="file" id="cam-front" accept="image/*" capture="environment">
     <input type="file" id="file-front" accept="image/*">
   </div>
 
-  <details>
+  <details class="disclose">
     <summary>This package is exempt from the Rules</summary>
     <div class="flags">
       <label><input type="checkbox" id="f-rest">
@@ -48,37 +62,39 @@
     </div>
   </details>
 
-  <p class="hint">Hold the phone flat against the panel, fill the frame with the printed
-  area, and keep the flash off the glossy surface.</p>
+  <p class="tip">Hold the phone flat against the panel, fill the frame with the printed area,
+  and keep the flash off the glossy surface.</p>
 
-  <button class="btn" id="go" disabled>Check compliance</button>
-
-  <div class="bulk">
-    <h3>Check several labels at once</h3>
-    <p>Pick multiple photos and each is checked as its own product, one after another.
-    Useful for working through a batch of label photos someone has sent you.</p>
-    <label for="file-bulk">Choose photos</label>
+  <div class="panel">
+    <h2>Check several labels at once</h2>
+    <p>Pick multiple photos and each is checked as its own product, one after another.</p>
+    <label class="panel__action" for="file-bulk">Choose photos</label>
     <input type="file" id="file-bulk" accept="image/*" multiple>
     <div class="queue" id="queue"></div>
+  </div>
+
+  <div class="actionbar">
+    <button class="btn" id="go" disabled>Check compliance</button>
   </div>
 </section>
 
 <section id="working" class="hide">
-  <div class="spin"><span class="dot"></span> Reading the label&hellip;</div>
+  <div class="working">
+    <div class="progress"><span></span></div>
+    <p class="working__stage" id="stage">Uploading the photos</p>
+  </div>
 </section>
 
 <section id="report" class="hide"></section>
 
 <section id="history-wrap">
-  <h2>Earlier checks</h2>
-  <p class="hint hint--pull">Stored on the server. Opening one needs no network
-  call to the reader, so these work when the connection does not.</p>
+  <h2 class="section-title">Earlier checks</h2>
   <div class="hist" id="history"></div>
 </section>
 
 <footer>
-  The label is read by a vision model; every pass or fail below it is decided by the rule
-  engine, not the model. Each check names the rule it applies.
+  The label is read by a vision model. Every pass or fail is decided by the rule engine,
+  not the model, and each finding names the rule it applies.
 </footer>
 {% endblock %}
 

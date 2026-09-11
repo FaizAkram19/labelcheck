@@ -7,6 +7,7 @@ from compliance import views
 
 urlpatterns = [
     path("", views.app, name="app"),
+    path("rules/", views.rules_page, name="rules-page"),
     path("admin/", admin.site.urls),
     path("api/", include("compliance.urls")),
 ]

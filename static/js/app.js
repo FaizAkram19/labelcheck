@@ -8,24 +8,32 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c =>
 
 const files = {DECLARATION:null, FRONT:null};
 
+/* Filled in from /api/health/ so the waiting screen can name a real number
+   instead of a vague promise. Never blocks anything if it fails. */
+let ruleCount = null;
+API.health().then(h => { ruleCount = h.rules_loaded; }).catch(() => {});
+
 
 /* ---- capture ---------------------------------------------------------- */
 
-function bindSlot(kind, inputIds, thumbId, slotId, lblId, capId){
+function bindSlot(kind, inputIds, thumbId, phId, slotId, lblId, capId){
   inputIds.forEach(inputId => $(inputId).addEventListener('change', e => {
     const f = e.target.files[0];
     if(!f) return;
     files[kind] = f;
-    $(thumbId).src = URL.createObjectURL(f);
+    const thumb = $(thumbId);
+    thumb.src = URL.createObjectURL(f);
+    thumb.hidden = false;
+    $(phId).hidden = true;
     $(slotId).classList.add('filled');
     $(lblId).textContent = 'Retake';
-    $(capId).textContent = f.name.length > 28 ? f.name.slice(0,28) + '\u2026' : f.name;
+    $(capId).textContent = f.name.length > 26 ? f.name.slice(0,26) + '\u2026' : f.name;
     $('#go').disabled = !files.DECLARATION;
   }));
 }
 
-bindSlot('DECLARATION',['#cam-dec','#file-dec'],'#thumb-dec','#slot-dec','#lbl-dec','#cap-dec');
-bindSlot('FRONT',['#cam-front','#file-front'],'#thumb-front','#slot-front','#lbl-front','#cap-front');
+bindSlot('DECLARATION',['#cam-dec','#file-dec'],'#thumb-dec','#ph-dec','#slot-dec','#lbl-dec','#cap-dec');
+bindSlot('FRONT',['#cam-front','#file-front'],'#thumb-front','#ph-front','#slot-front','#lbl-front','#cap-front');
 
 const show = id => {
   ['#capture','#working','#report'].forEach(s => $(s).classList.add('hide'));
@@ -36,13 +44,33 @@ function reset(){
   files.DECLARATION = files.FRONT = null;
   ['#cam-dec','#file-dec','#cam-front','#file-front'].forEach(s => $(s).value = '');
   ['#slot-dec','#slot-front'].forEach(s => $(s).classList.remove('filled'));
-  $('#thumb-dec').removeAttribute('src'); $('#thumb-front').removeAttribute('src');
+  ['#thumb-dec','#thumb-front'].forEach(s => {
+    $(s).removeAttribute('src'); $(s).hidden = true;
+  });
+  ['#ph-dec','#ph-front'].forEach(s => { $(s).hidden = false; });
   $('#lbl-dec').textContent = 'Take photo'; $('#lbl-front').textContent = 'Take photo';
   $('#cap-dec').textContent = 'The side with the fine print. Required.';
   $('#cap-front').textContent = 'Add it if the price or quantity is on the front.';
   $('#go').disabled = true;
   show('#capture'); $('#history-wrap').classList.remove('hide');
   window.scrollTo(0,0);
+}
+
+
+/* ---- the wait --------------------------------------------------------- */
+/* A scan takes several seconds and almost all of it is the vision model. One
+   frozen line of text for that long reads as a hang, so the stages name what is
+   happening - which is also the pipeline we want a judge to notice. */
+
+function startStages(){
+  const stages = [
+    [0,    'Uploading the photos'],
+    [1400, 'Reading the declarations off the label'],
+    [4000, ruleCount ? `Checking ${ruleCount} rules` : 'Checking against the Rules'],
+  ];
+  const timers = stages.map(([delay, text]) =>
+    setTimeout(() => { $('#stage').textContent = text; }, delay));
+  return () => timers.forEach(clearTimeout);
 }
 
 
@@ -60,6 +88,7 @@ $('#go').addEventListener('click', async () => {
 
   show('#working');
   $('#history-wrap').classList.add('hide');
+  const stopStages = startStages();
   try{
     const {ok, data} = await API.createScan(fd);
     if(!ok){ renderError(data); return; }
@@ -67,6 +96,8 @@ $('#go').addEventListener('click', async () => {
     loadHistory();
   }catch(err){
     renderError({detail:'Could not reach the server. Check that the phone and the laptop are on the same network.'});
+  }finally{
+    stopStages();
   }
 });
 
@@ -82,10 +113,11 @@ $('#file-bulk').addEventListener('change', async e => {
 
   const rows = picked.map((f,i) => {
     const id = 'q' + Date.now() + i;
-    return {id, file:f, name: f.name.length > 30 ? f.name.slice(0,30)+'\u2026' : f.name};
+    return {id, file:f, name: f.name.length > 28 ? f.name.slice(0,28)+'\u2026' : f.name};
   });
   $('#queue').innerHTML = rows.map(r =>
-    `<div id="${r.id}"><span>${esc(r.name)}</span><span class="st q-wait">waiting</span></div>`
+    `<div class="queue__row" id="${r.id}"><span class="queue__name">${esc(r.name)}</span>
+     <span class="st q-wait">waiting</span></div>`
   ).join('');
 
   const setState = (id, cls, text) => {
@@ -102,8 +134,13 @@ $('#file-bulk').addEventListener('change', async e => {
       const {ok, data} = await API.createScan(fd);
       if(!ok){ setState(r.id, 'q-err', 'failed'); continue; }
       const label = {COMPLIANT:'compliant', NON_COMPLIANT:'not compliant',
-                     EXEMPT:'exempt'}[data.verdict] || 'done';
+                     INCOMPLETE:'incomplete', EXEMPT:'exempt'}[data.verdict] || 'done';
       setState(r.id, data.verdict === 'COMPLIANT' ? 'q-ok' : 'q-err', label);
+      const row = document.getElementById(r.id);
+      if(row){
+        row.classList.add('queue__row--open');
+        row.addEventListener('click', () => openScan(data.id));
+      }
     }catch(err){
       setState(r.id, 'q-err', 'failed');
     }
@@ -117,13 +154,15 @@ $('#file-bulk').addEventListener('change', async e => {
 const MARK = {PASS:['m-pass','\u2713'], FAIL:['m-fail','\u2715'], SKIP:['m-skip','\u2013'],
               RECHECK:['m-recheck','?'], INFO:['m-info','i']};
 
+const PANEL_NAME = {DECLARATION:'Declaration panel', FRONT:'Front panel'};
+
 function verdictBlock(d){
-  if(d.verdict === 'EXEMPT') return `<div class="verdict v-exempt"><h3>Outside the Rules</h3>
+  if(d.verdict === 'EXEMPT') return `<div class="verdict v-exempt"><h2>Outside the Rules</h2>
     <p>${esc(d.exempt_reason)}</p></div>`;
   const c = d.counts || {};
-  if(d.verdict === 'COMPLIANT') return `<div class="verdict v-pass"><h3>Compliant</h3>
+  if(d.verdict === 'COMPLIANT') return `<div class="verdict v-pass"><h2>Compliant</h2>
     <p>${c.passed} checks passed. No violation found.</p></div>`;
-  if(d.verdict === 'INCOMPLETE') return `<div class="verdict v-part"><h3>Check incomplete</h3>
+  if(d.verdict === 'INCOMPLETE') return `<div class="verdict v-part"><h2>Check incomplete</h2>
     <p>No violation found in what was visible, but ${c.recheck}
     ${c.recheck === 1 ? 'declaration is' : 'declarations are'} printed on a part of the package
     that was not photographed. Capture that panel and scan again.</p></div>`;
@@ -133,8 +172,20 @@ function verdictBlock(d){
   const tail = c.recheck
     ? ` ${c.recheck} further ${c.recheck === 1 ? 'declaration is' : 'declarations are'} on a panel
        that was not photographed.` : '';
-  return `<div class="verdict v-fail"><h3>Not compliant</h3>
+  return `<div class="verdict v-fail"><h2>Not compliant</h2>
     <p>${bits.join(' and ')}.${tail}</p></div>`;
+}
+
+/* The photographs the verdict was read from. Without these a report is a claim
+   about a packet nobody can see. */
+function shotsStrip(images){
+  const shots = (images || []).filter(i => i.url);
+  if(!shots.length) return '';
+  return `<div class="shots">${shots.map(i => `
+    <a class="shots__item" href="${esc(i.url)}" target="_blank" rel="noopener">
+      <img src="${esc(i.url)}" alt="${esc(PANEL_NAME[i.panel] || 'Label photo')}">
+      <span>${esc(PANEL_NAME[i.panel] || 'Label photo')}</span>
+    </a>`).join('')}</div>`;
 }
 
 function findingBlock(v){
@@ -155,7 +206,8 @@ function findingBlock(v){
 function fieldsTable(f){
   const rows = Object.entries(f || {}).filter(([,v]) => v);
   if(!rows.length) return '';
-  return `<details class="read-fields"><summary>What was read off the label (${rows.length} fields)</summary>
+  return `<details class="disclose read-fields">
+    <summary>What was read off the label (${rows.length} fields)</summary>
     <table>${rows.map(([k,v]) =>
       `<tr><td>${esc(k.replace(/_/g,' '))}</td><td>${esc(v)}</td></tr>`).join('')}</table>
     </details>`;
@@ -168,12 +220,13 @@ function renderReport(d){
   $('#report').innerHTML = `
     ${verdictBlock(d)}
     <p class="scanned">${esc(d.product_label || 'Unnamed product')} \u00b7 check #${d.id}</p>
+    ${shotsStrip(d.images)}
     ${vs.map(findingBlock).join('')}
     ${fieldsTable(d.fields_read)}
-    ${(d.unclear && d.unclear.length) ? `<p class="hint hint--gap">
+    ${(d.unclear && d.unclear.length) ? `<p class="tip tip--gap">
       Read with low confidence: ${d.unclear.map(f => esc(f.replace(/_/g,' '))).join(', ')}.
       Retake the photo if a finding above looks wrong.</p>` : ''}
-    ${d.notes ? `<p class="hint hint--gap-sm">Reader note: ${esc(d.notes)}</p>` : ''}
+    ${d.notes ? `<p class="tip">Reader note: ${esc(d.notes)}</p>` : ''}
     <button class="btn secondary restart" onclick="reset()">Check another package</button>`;
   $('#history-wrap').classList.remove('hide');
   window.scrollTo(0,0);
@@ -192,32 +245,46 @@ function renderError(data){
 
 /* ---- history ---------------------------------------------------------- */
 
-const TAG = {COMPLIANT:['Compliant','tag-pass'], NON_COMPLIANT:['Not compliant','tag-fail'],
-             INCOMPLETE:['Incomplete','tag-part'], EXEMPT:['Exempt','tag-exempt'],
-             UNKNOWN:['\u2014','tag-unknown']};
+const TAG = {COMPLIANT:['Compliant','pill-pass'], NON_COMPLIANT:['Not compliant','pill-fail'],
+             INCOMPLETE:['Incomplete','pill-part'], EXEMPT:['Exempt','pill-exempt'],
+             UNKNOWN:['Unknown','pill-unknown']};
+
+function when(iso){
+  const d = new Date(iso);
+  if(isNaN(d)) return '';
+  return d.toLocaleString('en-IN',
+    {day:'numeric', month:'short', hour:'numeric', minute:'2-digit'});
+}
 
 async function loadHistory(){
   try{
     const list = await API.history();
     if(!list.length){
-      $('#history').innerHTML = `<p class="hint">Nothing checked yet.</p>`; return;
+      $('#history').innerHTML =
+        `<p class="empty">Nothing checked yet. Photograph a label to start.</p>`;
+      return;
     }
     $('#history').innerHTML = list.map(s => {
       const [text, cls] = TAG[s.verdict] || TAG.UNKNOWN;
       const c = s.counts || {};
       const detail = s.verdict === 'NON_COMPLIANT'
         ? `${c.major||0} violations, ${c.minor||0} defects` : '';
+      const sub = [when(s.created_at), detail, s.is_demo ? 'example' : '']
+        .filter(Boolean).join(' \u00b7 ');
       return `<button onclick="openScan(${s.id})">
         <span class="row"><span class="name">${esc(s.product_label || 'Unnamed product')}</span>
-        <span class="tag ${cls}">${text}</span></span>
-        <span class="sub">#${s.id}${detail ? ' \u00b7 ' + detail : ''}${s.is_demo ? ' \u00b7 example' : ''}</span>
+        <span class="pill ${cls}">${text}</span></span>
+        <span class="sub">${esc(sub)}</span>
       </button>`;
     }).join('');
-  }catch(e){ $('#history').innerHTML = `<p class="hint">History unavailable.</p>`; }
+  }catch(e){
+    $('#history').innerHTML = `<p class="empty">History unavailable.</p>`;
+  }
 }
 
 async function openScan(id){
   show('#working');
+  $('#stage').textContent = 'Opening the check';
   try{
     renderReport(await API.scan(id));
   }catch(e){ renderError({detail:'Could not load that check.'}); }

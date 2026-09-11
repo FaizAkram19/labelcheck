@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}What this checks{% endblock %}
+{% block nav %}<a class="appbar__link" href="/">Back</a>{% endblock %}
+
+{% block content %}
+<h1 class="page-title">What this checks</h1>
+<p class="lede">Every finding in a report names one of these. They are stored in the database
+rather than written into the code, so an amendment to the Rules is a data edit.</p>
+
+<div id="rules-list" class="rules">
+  <p class="tip">Loading the catalogue&hellip;</p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/api.js' %}"></script>
+<script src="{% static 'js/rules.js' %}"></script>
+{% endblock %}

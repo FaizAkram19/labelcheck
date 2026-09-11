@@ -148,3 +148,12 @@ def health(request):
 
 def app(request):
     return render(request, "app.html")
+
+
+def rules_page(request):
+    """The rule catalogue as a screen.
+
+    Reads the same rows the engine runs, so this page cannot drift from what the
+    checks actually do.
+    """
+    return render(request, "rules.html")
