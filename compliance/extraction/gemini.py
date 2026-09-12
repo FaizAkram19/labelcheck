@@ -42,7 +42,7 @@ FALLBACK_MODELS = [
 
 # Transient on Google's side, not ours: 503 is an overloaded model, 500 and 504
 # are internal or gateway errors, 429 is rate limiting. All worth retrying.
-RETRYABLE = {429, 500, 502, 503, 504}
+RETRYABLE = {500, 502, 503, 504}
 
 # Nice to have but not essential. If a model rejects one, drop it and continue.
 OPTIONAL_CONFIG_KEYS = ("thinkingConfig", "responseSchema")
