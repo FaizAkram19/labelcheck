@@ -3,6 +3,8 @@ from django.shortcuts import render
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from rest_framework.decorators import api_view, authentication_classes
+from django.views.decorators.csrf import ensure_csrf_cookie
 
 from .engine.runner import evaluate
 from .extraction import gemini
@@ -33,6 +35,7 @@ def _run_rules(scan, merged, is_imported, manual_flags):
 
 
 @api_view(["POST"])
+@authentication_classes([])
 def create_scan(request):
     """Accept one or two label images and return the compliance report.
 
@@ -113,6 +116,7 @@ def scan_list(request):
 
 
 @api_view(["POST"])
+@authentication_classes([])
 def recheck(request, pk):
     """Re-run the rules against stored extraction. No network call.
 
@@ -145,7 +149,7 @@ def health(request):
         "scans": Scan.objects.count(),
     })
 
-
+@ensure_csrf_cookie
 def app(request):
     return render(request, "app.html")
 
